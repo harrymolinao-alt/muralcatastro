@@ -52,7 +52,7 @@
     </style>
 </head>
 <body>
-    <div id="status">Enfoca el marcador de 20x20cm</div>
+    <div id="status">Cargando... Prepara marcador HIRO</div>
     <button id="playButton">▶ REPRODUCIR</button>
 
     <a-scene 
@@ -79,8 +79,8 @@
             </video>
         </a-assets>
         
-        <!-- Marcador 20cm = TV 55" (escala 6.1x) -->
-        <a-marker type="pattern" url="marker.patt" id="marker">
+        <!-- Usar marcador HIRO por defecto (más estable) -->
+        <a-marker preset="hiro" id="marker">
             <a-video
                 src="#arVideo"
                 width="6.1"
@@ -101,25 +101,54 @@
         
         let isPlaying = false;
         let markerVisible = false;
+        let videoLoaded = false;
         
         // Configurar video para móviles
         video.muted = true;
         video.playsInline = true;
         
+        // Debug: Verificar carga de archivos
+        console.log('🎬 Iniciando AR Video Player');
+        console.log('📱 User Agent:', navigator.userAgent);
+        
+        // Eventos de carga de video
+        video.addEventListener('loadstart', () => {
+            console.log('📥 Iniciando carga de video...');
+            status.textContent = 'Cargando video...';
+        });
+        
+        video.addEventListener('loadeddata', () => {
+            videoLoaded = true;
+            console.log('✅ Video cargado correctamente');
+            status.textContent = 'Video listo - Enfoca marcador HIRO';
+        });
+        
+        video.addEventListener('error', (e) => {
+            console.error('❌ Error de video:', e);
+            console.error('❌ Video src:', video.src);
+            status.textContent = 'ERROR: video.mp4 no encontrado';
+        });
+        
+        video.addEventListener('canplay', () => {
+            console.log('🎯 Video puede reproducirse');
+        });
+        
         // Eventos del marcador
         marker.addEventListener('markerFound', function() {
+            console.log('🎯 ¡MARCADOR HIRO DETECTADO!');
             markerVisible = true;
-            status.textContent = '¡Marcador detectado! - TV 55"';
+            status.textContent = '¡Marcador HIRO detectado! - TV 55"';
             playButton.style.display = 'block';
             
-            if (!isPlaying) {
-                playVideo();
+            if (videoLoaded && !isPlaying) {
+                setTimeout(() => playVideo(), 300);
             }
         });
         
         marker.addEventListener('markerLost', function() {
+            console.log('📍 Marcador HIRO perdido');
             markerVisible = false;
-            status.textContent = 'Marcador perdido - Reenfoca';
+            status.textContent = 'Marcador perdido - Enfoca HIRO';
             playButton.style.display = 'none';
             pauseVideo();
         });
@@ -137,36 +166,52 @@
         
         // Funciones de video
         function playVideo() {
-            video.play()
-                .then(() => {
+            if (!videoLoaded) {
+                console.warn('⚠️ Video no cargado aún');
+                status.textContent = 'Esperando que cargue el video...';
+                return;
+            }
+            
+            console.log('▶️ Intentando reproducir video...');
+            const playPromise = video.play();
+            
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
                     isPlaying = true;
+                    console.log('✅ Video reproduciéndose');
                     playButton.textContent = '⏸ PAUSAR';
-                })
-                .catch(error => {
-                    console.log('Error reproduciendo:', error);
+                    status.textContent = 'Reproduciéndose en TV 55"';
+                }).catch(error => {
+                    console.error('❌ Error reproduciendo:', error);
                     // Fallback: asegurar que esté muted
                     video.muted = true;
                     video.play().then(() => {
                         isPlaying = true;
                         playButton.textContent = '⏸ PAUSAR';
                         status.textContent = 'Reproduciéndose (sin audio)';
+                        console.log('✅ Video reproduciéndose (muted)');
+                    }).catch(err => {
+                        console.error('❌ Falló reproducción muted:', err);
+                        status.textContent = 'ERROR: No se puede reproducir';
                     });
                 });
+            }
         }
         
         function pauseVideo() {
             video.pause();
             isPlaying = false;
             playButton.textContent = '▶ REPRODUCIR';
+            console.log('⏸️ Video pausado');
         }
         
         // Cargar video
         video.addEventListener('loadeddata', () => {
-            status.textContent = 'Video listo - Enfoca marcador';
+            status.textContent = 'Video listo - Enfoca marcador HIRO';
         });
         
         video.addEventListener('error', () => {
-            status.textContent = 'Error: Verifica video.mp4';
+            status.textContent = 'ERROR: Verifica que video.mp4 existe en la carpeta';
         });
         
         // Prevenir zoom en móviles
