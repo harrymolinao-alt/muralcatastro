@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>AR Video Mural</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+        #status {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+            font-size: 14px;
+        }
+        #playButton {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 1000;
+            display: none;
+        }
+        #playButton:active {
+            background: #0056CC;
+        }
+    </style>
+</head>
+<body>
+    <div id="status">Cargando... Prepara marcador HIRO</div>
+    <button id="playButton">▶ REPRODUCIR</button>
+
+    <a-scene 
+        embedded 
+        arjs='
+            sourceType: webcam; 
+            sourceWidth: 1280; 
+            sourceHeight: 720; 
+            displayWidth: 1280; 
+            displayHeight: 720;
+            debugUIEnabled: false;
+        '
+        vr-mode-ui="enabled: false">
+        
+        <a-assets>
+            <video 
+                id="arVideo" 
+                src="video.mp4" 
+                loop
+                playsinline 
+                webkit-playsinline
+                crossorigin="anonymous">
+            </video>
+        </a-assets>
+        
+        <!-- Usar marcador HIRO -->
+        <a-marker preset="hiro" id="marker">
+            <a-video
+                src="#arVideo"
+                width="6.1"
+                height="3.43"
+                position="0 0 0"
+                rotation="-90 0 0">
+            </a-video>
+        </a-marker>
+        
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        const video = document.querySelector('#arVideo');
+        const marker = document.querySelector('#marker');
+        const status = document.querySelector('#status');
+        const playButton = document.querySelector('#playButton');
+        
+        let isPlaying = false;
+        let markerVisible = false;
+        let videoLoaded = false;
+        
+        // Configurar video
+        video.playsInline = true;
+        
+        // Eventos de carga de video
+        video.addEventListener('loadeddata', () => {
+            videoLoaded = true;
+            status.textContent = 'Video listo - Enfoca marcador HIRO';
+        });
+        
+        video.addEventListener('error', () => {
+            status.textContent = 'ERROR: Verifica que video.mp4 existe en la carpeta';
+        });
+        
+        // Eventos del marcador
+        marker.addEventListener('markerFound', function() {
+            markerVisible = true;
+            status.textContent = '¡Marcador HIRO detectado!';
+            playButton.style.display = 'block';
+        });
+        
+        marker.addEventListener('markerLost', function() {
+            markerVisible = false;
+            status.textContent = 'Marcador perdido - Enfoca HIRO';
+            playButton.style.display = 'none';
+            pauseVideo();
+        });
+        
+        // Botón de reproducción manual
+        playButton.addEventListener('click', function() {
+            if (isPlaying) {
+                pauseVideo();
+                this.textContent = '▶ REPRODUCIR';
+            } else {
+                // Aquí sí quitamos mute y activamos el audio
+                video.muted = false;
+                video.play().then(() => {
+                    isPlaying = true;
+                    this.textContent = '⏸ PAUSAR';
+                    status.textContent = 'Reproduciéndose con audio';
+                }).catch(err => {
+                    console.error('❌ Error al reproducir con audio:', err);
+                    status.textContent = 'ERROR: No se puede reproducir';
+                });
+            }
+        });
+        
+        function pauseVideo() {
+            video.pause();
+            isPlaying = false;
+            playButton.textContent = '▶ REPRODUCIR';
+        }
+    </script>
+</body>
+</html>
