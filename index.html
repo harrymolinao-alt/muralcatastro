@@ -1,64 +1,454 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>AR Video Player (HD)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  
-  <!-- Librerías -->
-  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <meta charset="UTF-8">
+    <title>AR Video Player (HD) - Mural Interactivo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, minimum-scale=1, maximum-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    
+    <!-- A-Frame y AR.js optimizados -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: #000;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        
+        /* Loading screen */
+        #loadingScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            color: white;
+            transition: opacity 0.5s ease;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* UI Controls */
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 15px;
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .control-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .control-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.05);
+        }
+        
+        /* Status indicator */
+        #status {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Responsive adjustments */
+        @media (orientation: portrait) {
+            #controls {
+                bottom: 50px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .control-btn {
+                padding: 6px 10px;
+                font-size: 11px;
+            }
+        }
+        
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
 </head>
-<body style="margin: 0; overflow: hidden;">
+<body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen">
+        <div class="spinner"></div>
+        <h2>Cargando AR Video Player</h2>
+        <p>Preparando experiencia inmersiva...</p>
+    </div>
+    
+    <!-- Status Indicator -->
+    <div id="status">Buscando marcador...</div>
+    
+    <!-- Controls -->
+    <div id="controls" class="hidden">
+        <button id="playPauseBtn" class="control-btn">⏯️ Play/Pause</button>
+        <button id="muteBtn" class="control-btn">🔊 Audio</button>
+        <button id="fullscreenBtn" class="control-btn">⛶ Pantalla Completa</button>
+    </div>
 
-  <!-- Escena AR -->
-  <a-scene 
-      vr-mode-ui="enabled: false" 
-      embedded 
-      arjs="sourceType: webcam; debugUIEnabled: false;">
+    <a-scene 
+        id="arScene"
+        embedded 
+        arjs='
+            sourceType: webcam; 
+            sourceWidth: 1920; 
+            sourceHeight: 1080; 
+            displayWidth: 1920; 
+            displayHeight: 1080;
+            debugUIEnabled: false;
+            detectionMode: mono_and_matrix;
+            matrixCodeType: 3x3;
+            trackingMethod: best;
+            maxDetectionRate: 60;
+            canvasWidth: 1920;
+            canvasHeight: 1080;
+        '
+        renderer='
+            antialias: true; 
+            colorManagement: true; 
+            physicallyCorrectLights: true;
+            outputColorSpace: sRGB;
+            toneMapping: ACESFilmic;
+            toneMappingExposure: 1;
+        '
+        vr-mode-ui="enabled: false"
+        device-orientation-permission-ui="enabled: false">
+        
+        <a-assets timeout="10000">
+            <video 
+                id="arVideo" 
+                src="video.mp4" 
+                loop="true" 
+                muted="false"
+                playsinline 
+                webkit-playsinline
+                crossorigin="anonymous"
+                preload="auto">
+            </video>
+        </a-assets>
+        
+        <!-- Marker con configuración optimizada para 55" -->
+        <a-marker 
+            id="videoMarker"
+            type="pattern" 
+            url="marker.patt"
+            smooth="true"
+            smoothCount="10"
+            smoothTolerance="0.01"
+            smoothThreshold="5"
+            raycaster="objects: .clickable"
+            cursor="fuse: false; rayOrigin: mouse;">
+            
+            <!-- Video plano optimizado para 55 pulgadas -->
+            <a-video
+                id="videoPlane"
+                src="#arVideo"
+                width="4.8"
+                height="2.7"
+                position="0 0 0"
+                rotation="-90 0 0"
+                material="
+                    shader: flat;
+                    transparent: false;
+                    alphaTest: 0.1;
+                    side: double;
+                "
+                geometry="
+                    primitive: plane;
+                    segmentsHeight: 1;
+                    segmentsWidth: 1;
+                "
+                class="clickable"
+                animation__scale="
+                    property: scale;
+                    from: 0.8 0.8 0.8;
+                    to: 1 1 1;
+                    dur: 800;
+                    easing: easeOutQuart;
+                    startEvents: markerFound;
+                "
+                animation__fadeout="
+                    property: material.opacity;
+                    from: 1;
+                    to: 0;
+                    dur: 500;
+                    easing: easeInQuart;
+                    startEvents: markerLost;
+                ">
+            </a-video>
+            
+            <!-- Marco decorativo opcional -->
+            <a-box 
+                position="0 0 -0.01"
+                width="5"
+                height="2.9"
+                depth="0.05"
+                material="color: #333; metalness: 0.8; roughness: 0.2"
+                visible="false">
+            </a-box>
+        </a-marker>
+        
+        <!-- Cámara optimizada -->
+        <a-camera 
+            id="arCamera"
+            gps-camera
+            rotation-reader
+            look-controls="enabled: false"
+            wasd-controls="enabled: false"
+            cursor="rayOrigin: mouse">
+        </a-camera>
+        
+        <!-- Iluminación ambiental -->
+        <a-light type="ambient" color="#404040" intensity="0.4"></a-light>
+        <a-light type="directional" position="0 5 5" color="#ffffff" intensity="0.6"></a-light>
+    </a-scene>
 
-    <!-- Activos -->
-    <a-assets>
-      <video id="vid" 
-             src="video.mp4" 
-             preload="auto" 
-             autoplay 
-             loop 
-             muted 
-             playsinline 
-             webkit-playsinline 
-             crossorigin="anonymous">
-      </video>
-    </a-assets>
-
-    <!-- Marcador -->
-    <a-marker type="pattern" url="marker.patt">
-      <a-video 
-        src="#vid" 
-        width="2" 
-        height="1.125" 
-        position="0 0 0" 
-        rotation="-90 0 0">
-      </a-video>
-    </a-marker>
-
-    <!-- Cámara -->
-    <a-entity camera></a-entity>
-
-  </a-scene>
-
-  <script>
-    const marker = document.querySelector('a-marker');
-    const video = document.querySelector('#vid');
-
-    marker.addEventListener('markerFound', () => {
-      video.play().catch(err => console.log("Autoplay bloqueado:", err));
-    });
-
-    marker.addEventListener('markerLost', () => {
-      video.pause();
-    });
-  </script>
-
+    <script>
+        // Variables globales
+        let video, marker, scene, isVideoPlaying = false, isMuted = false;
+        
+        // Inicialización cuando el DOM está listo
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+        
+        function initializeApp() {
+            // Elementos del DOM
+            video = document.querySelector('#arVideo');
+            marker = document.querySelector('#videoMarker');
+            scene = document.querySelector('#arScene');
+            
+            // Configurar video
+            setupVideo();
+            
+            // Configurar eventos AR
+            setupAREvents();
+            
+            // Configurar controles UI
+            setupControls();
+            
+            // Configurar orientación
+            setupOrientationHandling();
+            
+            // Ocultar loading screen después de inicializar
+            setTimeout(() => {
+                document.getElementById('loadingScreen').classList.add('hidden');
+            }, 2000);
+        }
+        
+        function setupVideo() {
+            // Optimizaciones de video para móvil
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+            video.muted = true; // Iniciar muted para autoplay móvil
+            
+            // Eventos del video
+            video.addEventListener('loadeddata', () => {
+                console.log('Video cargado correctamente');
+                updateStatus('Video listo - Busca el marcador');
+            });
+            
+            video.addEventListener('error', (e) => {
+                console.error('Error cargando video:', e);
+                updateStatus('Error: No se pudo cargar el video');
+            });
+            
+            // Precargar video
+            video.load();
+        }
+        
+        function setupAREvents() {
+            // Evento cuando se encuentra el marcador
+            marker.addEventListener('markerFound', function() {
+                console.log('Marcador encontrado - Reproduciendo video');
+                updateStatus('¡Marcador detectado!');
+                document.getElementById('controls').classList.remove('hidden');
+                
+                // Reproducir video con un pequeño delay
+                setTimeout(() => {
+                    playVideo();
+                }, 100);
+            });
+            
+            // Evento cuando se pierde el marcador
+            marker.addEventListener('markerLost', function() {
+                console.log('Marcador perdido - Pausando video');
+                updateStatus('Marcador perdido - Buscando...');
+                document.getElementById('controls').classList.add('hidden');
+                pauseVideo();
+            });
+        }
+        
+        function setupControls() {
+            // Play/Pause
+            document.getElementById('playPauseBtn').addEventListener('click', function() {
+                if (isVideoPlaying) {
+                    pauseVideo();
+                } else {
+                    playVideo();
+                }
+            });
+            
+            // Mute/Unmute
+            document.getElementById('muteBtn').addEventListener('click', function() {
+                toggleMute();
+            });
+            
+            // Fullscreen
+            document.getElementById('fullscreenBtn').addEventListener('click', function() {
+                toggleFullscreen();
+            });
+        }
+        
+        function setupOrientationHandling() {
+            // Manejar cambios de orientación
+            window.addEventListener('orientationchange', function() {
+                setTimeout(() => {
+                    // Ajustar resolución según orientación
+                    const scene = document.querySelector('a-scene');
+                    const isPortrait = window.innerHeight > window.innerWidth;
+                    
+                    if (isPortrait) {
+                        // Modo vertical - ajustar video plane
+                        document.querySelector('#videoPlane').setAttribute('width', '3.6');
+                        document.querySelector('#videoPlane').setAttribute('height', '2.025');
+                        updateStatus('Modo vertical activado');
+                    } else {
+                        // Modo horizontal - tamaño original
+                        document.querySelector('#videoPlane').setAttribute('width', '4.8');
+                        document.querySelector('#videoPlane').setAttribute('height', '2.7');
+                        updateStatus('Modo horizontal activado');
+                    }
+                    
+                    // Reiniciar AR después del cambio
+                    setTimeout(() => {
+                        scene.renderer.setSize(window.innerWidth, window.innerHeight);
+                    }, 500);
+                }, 500);
+            });
+        }
+        
+        // Funciones de control de video
+        function playVideo() {
+            const playPromise = video.play();
+            
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        isVideoPlaying = true;
+                        console.log('Video reproduciendo');
+                    })
+                    .catch((error) => {
+                        console.error('Error al reproducir:', error);
+                        // Si falla, intentar con muted
+                        video.muted = true;
+                        video.play().then(() => {
+                            isVideoPlaying = true;
+                            updateStatus('Video reproduciéndose (sin audio)');
+                        });
+                    });
+            }
+        }
+        
+        function pauseVideo() {
+            video.pause();
+            isVideoPlaying = false;
+            console.log('Video pausado');
+        }
+        
+        function toggleMute() {
+            isMuted = !isMuted;
+            video.muted = isMuted;
+            document.getElementById('muteBtn').textContent = isMuted ? '🔇 Audio' : '🔊 Audio';
+            updateStatus(isMuted ? 'Audio desactivado' : 'Audio activado');
+        }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log('Error activando fullscreen:', err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        // Utilidades
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+            setTimeout(() => {
+                if (document.getElementById('status').textContent === message) {
+                    document.getElementById('status').textContent = 'AR Video Player Activo';
+                }
+            }, 3000);
+        }
+        
+        // Prevenir zoom en iOS
+        document.addEventListener('gesturestart', function (e) {
+            e.preventDefault();
+        });
+        
+        // Optimización de rendimiento
+        window.addEventListener('load', function() {
+            // Limpiar console logs en producción
+            if (window.location.hostname !== 'localhost') {
+                console.log = function() {};
+            }
+        });
+    </script>
 </body>
 </html>
